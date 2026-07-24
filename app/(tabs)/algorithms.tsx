@@ -1,0 +1,1 @@
+export { AlgorithmsScreen as default } from '../../src/screens/AlgorithmsScreen';
