@@ -14,7 +14,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const { signInWithEmail, loading, error, clearError } = useEmailAuth();
-  const { signInWithGoogle, loading: googleLoading, disabled: googleDisabled } = useGoogleAuth();
+  const { signInWithGoogle, loading: googleLoading, disabled: googleDisabled, error: googleError } = useGoogleAuth();
 
   useEffect(() => {
     if (session) router.replace('/(tabs)/home');
@@ -46,9 +46,9 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.form}>
-            {error && (
+            {(error || googleError) && (
               <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>{error}</Text>
+                <Text style={styles.errorText}>{error ?? googleError}</Text>
                 <TouchableOpacity onPress={clearError}><Ionicons name="close" size={18} color="#FF4757" /></TouchableOpacity>
               </View>
             )}
