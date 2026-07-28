@@ -21,6 +21,7 @@
     "expo-linking": "~57.0.4",
     "expo-router": "~57.0.8",
     "expo-secure-store": "~57.0.1",
+    "expo-splash-screen": "~57.0.5",
     "expo-status-bar": "~57.0.1",
     "expo-web-browser": "~57.0.2",
     "react": "19.2.3",
@@ -42,7 +43,14 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "doctor": "npx expo-doctor",
+    "export:web": "expo export --platform web --output-dir dist-web",
+    "ci": "npm run typecheck && npm run doctor"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "private": true
 }

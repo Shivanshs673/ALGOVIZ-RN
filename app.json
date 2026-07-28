@@ -19,12 +19,6 @@
     "scheme": "algovizplus",
     "userInterfaceStyle": "automatic",
 
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1E1E2E"
-    },
-
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -61,7 +55,15 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#1E1E2E"
+        }
+      ]
     ],
 
     "extra": {

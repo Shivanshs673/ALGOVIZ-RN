@@ -14,6 +14,7 @@ Project documentation for **AlgoViz+** (`Harry0786/ALGOVIZ`), an Android learnin
 | [08_PROJECT_MANAGEMENT.md](./08_PROJECT_MANAGEMENT.md) | Project management (roles, roadmap, risks, CI/CD) |
 | [08_SUPABASE_SETUP.md](./08_SUPABASE_SETUP.md) | Supabase schema, RLS, storage, OAuth (React Native) |
 | [GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md) | Fix Google Sign-In 400 errors (iOS/Android client IDs) |
+| [CI_CD.md](./CI_CD.md) | GitHub Actions + EAS build/update/submit pipelines |
 | [code/INDEX.md](./code/INDEX.md) | Implementation code reference for Expo Router app |
 
 ## Quick facts
@@ -33,5 +34,8 @@ Project documentation for **AlgoViz+** (`Harry0786/ALGOVIZ`), an Android learnin
 - `SUPABASE_DEPLOYMENT_GUIDE.md` — SQL deployment
 - `scripts/supabase_full_recovery.sql` — full schema + RLS
 - `scripts/setup_user_profiles.sql` — profiles only
-- `.github/workflows/ci.yml` — CI
-- `.github/workflows/release-update.yml` — release publish
+- `.github/workflows/ci.yml` — CI (typecheck, expo-doctor, web export)
+- `.github/workflows/eas-build.yml` — EAS native builds
+- `.github/workflows/eas-update.yml` — OTA updates on merge to main
+- `.github/workflows/eas-submit.yml` — Store submission (manual)
+- `docs/CI_CD.md` — Setup secrets and workflow guide
