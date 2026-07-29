@@ -1,12 +1,12 @@
-import type { ExpoConfig, ConfigContext } from 'expo/config';
+/** @type {import('expo/config').ExpoConfig} */
+/** @param {import('expo/config').ConfigContext} param0 */
+module.exports = ({ config }) => {
+  const googleReverseScheme = (clientId) => {
+    if (!clientId) return null;
+    const match = clientId.match(/^([\d\w-]+)\.apps\.googleusercontent\.com$/);
+    return match ? `com.googleusercontent.apps.${match[1]}` : null;
+  };
 
-function googleReverseScheme(clientId: string | undefined): string | null {
-  if (!clientId) return null;
-  const match = clientId.match(/^([\d\w-]+)\.apps\.googleusercontent\.com$/);
-  return match ? `com.googleusercontent.apps.${match[1]}` : null;
-}
-
-export default ({ config }: ConfigContext): ExpoConfig => {
   const androidGoogleScheme = googleReverseScheme(
     process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
   );
@@ -22,6 +22,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...config.ios,
       infoPlist: {
         ...config.ios?.infoPlist,
+        ITSAppUsesNonExemptEncryption: false,
         CFBundleURLTypes: iosUrlSchemes.map((scheme) => ({
           CFBundleURLSchemes: [scheme],
         })),
@@ -46,5 +47,5 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           }
         : {}),
     },
-  } as ExpoConfig;
+  };
 };

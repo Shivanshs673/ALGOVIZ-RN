@@ -8,6 +8,18 @@ on:
       - '**/*.md'
       - '.github/**'
 
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Update channel (must match your EAS build profile channel)
+        required: true
+        type: choice
+        default: preview
+        options:
+          - preview
+          - production
+          - development
+
 concurrency:
   group: eas-update-${{ github.ref }}
   cancel-in-progress: true
@@ -32,15 +44,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate Expo config
+        run: npx expo config --type public > /dev/null
+
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Publish update to production channel
-        run: >-
-          eas update
-          --channel production
-          --message "${{ github.event.head_commit.message }}"
-          --non-interactive
+      - name: Publish OTA update
+        env:
+          UPDATE_CHANNEL: ${{ github.event_name == 'workflow_dispatch' && inputs.channel || 'preview' }}
+          UPDATE_MESSAGE: ${{ github.event.head_commit.message }}
+        run: eas update --channel "$UPDATE_CHANNEL" --message "$UPDATE_MESSAGE" --non-interactive

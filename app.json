@@ -10,6 +10,7 @@
 
     "updates": {
       "enabled": true,
+      "url": "https://u.expo.dev/d8e8a917-0e90-4acb-8dd6-63ae582d116f",
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
     },
@@ -26,8 +27,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.algoviz.plus",
-      "buildNumber": "1",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": ["algovizplus"]
@@ -38,7 +39,6 @@
 
     "android": {
       "package": "com.algoviz.plus",
-      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#1E1E2E",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -56,6 +56,7 @@
       "expo-router",
       "expo-secure-store",
       "expo-web-browser",
+      "expo-updates",
       [
         "expo-splash-screen",
         {
