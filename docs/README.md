@@ -15,6 +15,7 @@ Project documentation for **AlgoViz+** (`Harry0786/ALGOVIZ`), an Android learnin
 | [08_SUPABASE_SETUP.md](./08_SUPABASE_SETUP.md) | Supabase schema, RLS, storage, OAuth (React Native) |
 | [GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md) | Fix Google Sign-In 400 errors (iOS/Android client IDs) |
 | [CI_CD.md](./CI_CD.md) | GitHub Actions + EAS build/update/submit pipelines |
+| [STORE_DEPLOYMENT.md](./STORE_DEPLOYMENT.md) | Play Store & App Store submission checklist |
 | [code/INDEX.md](./code/INDEX.md) | Implementation code reference for Expo Router app |
 
 ## Quick facts

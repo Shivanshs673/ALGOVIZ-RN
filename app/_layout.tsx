@@ -3,13 +3,15 @@
 
 import 'react-native-gesture-handler';
 import { useEffect } from 'react';
-import { Stack, SplashScreen } from 'expo-router';
+import { Linking } from 'react-native';
+import { Stack, SplashScreen, useRouter } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '../src/lib/supabase/client';
 import { useAuthStore } from '../src/features/auth/store/authStore';
 import { useGlobalPresence } from '../src/features/presence/useGlobalPresence';
+import { createSessionFromUrl, getInitialAuthUrl, isAuthRecoveryUrl } from '../src/features/auth/deepLinkAuth';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -31,13 +33,35 @@ function PresenceController() {
 }
 
 export default function RootLayout() {
+  const router = useRouter();
   const { setSession, initialized, session } = useAuthStore();
 
   useEffect(() => {
+    async function handleAuthUrl(url: string) {
+      if (!isAuthRecoveryUrl(url)) return;
+      try {
+        const recoverySession = await createSessionFromUrl(url);
+        if (recoverySession) {
+          setSession(recoverySession);
+          router.push('/(auth)/password-reset');
+        }
+      } catch {
+        router.push('/(auth)/forgot-password');
+      }
+    }
+
     // Load persisted session on startup
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       SplashScreen.hideAsync().catch(() => undefined);
+    });
+
+    getInitialAuthUrl().then((url) => {
+      if (url) handleAuthUrl(url);
+    });
+
+    const linkSub = Linking.addEventListener('url', ({ url }) => {
+      handleAuthUrl(url);
     });
 
     // Subscribe to future auth state changes (sign-in, sign-out, token refresh)
@@ -47,7 +71,10 @@ export default function RootLayout() {
       setSession(newSession);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      linkSub.remove();
+    };
   }, []);
 
   // Hold splash until Supabase session is determined

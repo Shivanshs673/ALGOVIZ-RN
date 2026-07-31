@@ -4,13 +4,16 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, Alert, ActivityIndicator, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useProfile } from '../../src/features/profile/hooks/useProfile';
 import { useProgress } from '../../src/features/profile/hooks/useProgress';
 import { useAuthStore } from '../../src/features/auth/store/authStore';
+import { deleteUserAccount } from '../../src/features/profile/api/accountApi';
+import { isSupabaseConfigured } from '../../src/lib/supabase/client';
+import { LEGAL } from '../../src/constants/legal';
 import { Avatar } from '../../src/shared/components/Avatar';
 import { UpdateProfileInput } from '../../src/types/user.types';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,20 +37,19 @@ export default function ProfileScreen() {
 
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [phoneNo, setPhoneNo] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   function startEditing() {
     if (!profile) return;
     setName(profile.name);
     setUsername(profile.username);
-    setEmail(profile.email);
     setPhoneNo(profile.phoneNo ?? '');
     setIsEditing(true);
   }
 
   async function saveProfile() {
-    const input: UpdateProfileInput = { name, username, email, phoneNo };
+    const input: UpdateProfileInput = { name, username, phoneNo };
     try {
       await updateProfile(input);
     } catch (e: any) {
@@ -87,6 +89,43 @@ export default function ProfileScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: signOut },
     ]);
+  }
+
+  async function handleDeleteAccount() {
+    if (!profile || !isSupabaseConfigured) {
+      Alert.alert('Unavailable', 'Account deletion requires a connected Supabase backend.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete Account',
+      'This permanently removes your profile, progress, and room memberships. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deleteUserAccount(profile.userId);
+              Alert.alert('Account deleted', 'Your account and data have been removed.');
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : 'Could not delete account';
+              Alert.alert('Deletion issue', msg);
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function openUrl(url: string) {
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Could not open link', url);
+    });
   }
 
   if (isLoading && !profile) {
@@ -149,7 +188,8 @@ export default function ProfileScreen() {
               <Text style={styles.editTitle}>Edit Profile</Text>
               <InputField label="Display Name" value={name} onChange={setName} placeholder="Your name" />
               <InputField label="Username" value={username} onChange={setUsername} placeholder="@username" autoCapitalize="none" />
-              <InputField label="Email" value={email} onChange={setEmail} placeholder="you@example.com" autoCapitalize="none" keyboardType="email-address" />
+              <Text style={styles.readOnlyLabel}>Email</Text>
+              <Text style={styles.readOnlyValue}>{profile.email}</Text>
               <InputField label="Phone" value={phoneNo} onChange={setPhoneNo} placeholder="+1 234 567 8900" keyboardType="phone-pad" />
 
               <View style={styles.editActions}>
@@ -170,6 +210,28 @@ export default function ProfileScreen() {
           <StatCard label={'Algorithms\nCompleted'} value={String(summary.totalCompleted)} color="#43C59E" />
           <StatCard label={'Overall\nProgress'} value={`${summary.overallPercent}%`} color="#FFB347" />
         </View>
+
+        {/* Legal & account */}
+        <View style={styles.legalCard}>
+          <Text style={styles.legalTitle}>Legal & Support</Text>
+          <TouchableOpacity style={styles.legalRow} onPress={() => openUrl(LEGAL.privacyPolicyUrl)}>
+            <Ionicons name="shield-checkmark-outline" size={18} color="#6C63FF" />
+            <Text style={styles.legalText}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.legalRow} onPress={() => openUrl(LEGAL.termsOfServiceUrl)}>
+            <Ionicons name="document-text-outline" size={18} color="#6C63FF" />
+            <Text style={styles.legalText}>Terms of Service</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.legalRow} onPress={() => openUrl(`mailto:${LEGAL.supportEmail}`)}>
+            <Ionicons name="mail-outline" size={18} color="#6C63FF" />
+            <Text style={styles.legalText}>Contact Support</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity onPress={handleDeleteAccount} disabled={deleting} style={styles.deleteBtn}>
+          <Ionicons name="trash-outline" size={20} color="#FF4757" />
+          <Text style={styles.deleteText}>{deleting ? 'Deleting...' : 'Delete Account'}</Text>
+        </TouchableOpacity>
 
         {/* Sign out */}
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
@@ -260,6 +322,18 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, backgroundColor: '#1E1E2E', borderRadius: 14, padding: 14, alignItems: 'center', gap: 4 },
   statValue: { fontSize: 22, fontWeight: '800' },
   statLabel: { color: '#9E9EB8', fontSize: 11, textAlign: 'center', lineHeight: 16 },
+  legalCard: { backgroundColor: '#1E1E2E', borderRadius: 20, padding: 16, gap: 10 },
+  legalTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  legalRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  legalText: { color: '#9E9EB8', fontSize: 14 },
+  readOnlyLabel: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  readOnlyValue: { color: '#9E9EB8', fontSize: 15, paddingVertical: 4 },
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: '#FF475711', borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: '#FF475744',
+  },
+  deleteText: { color: '#FF4757', fontWeight: '700', fontSize: 15 },
   signOutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, backgroundColor: '#FF475722', borderRadius: 14, padding: 14,

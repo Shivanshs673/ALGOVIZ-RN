@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { roomsApi } from '../api/roomsApi';
-import { demoRoomsService } from '../services/demoRoomsService';
+import { demoRoomsService, isDemoRoomId } from '../services/demoRoomsService';
 import { useAuthStore } from '../../auth/store/authStore';
 import { CreateRoomInput } from '../../../types/studyroom.types';
 import { isSupabaseConfigured } from '../../../lib/supabase/client';
@@ -10,11 +10,7 @@ async function fetchRooms(category: string) {
   if (!isSupabaseConfigured) {
     return demoRoomsService.getAll(category);
   }
-  try {
-    return await roomsApi.getAll(category);
-  } catch {
-    return demoRoomsService.getAll(category);
-  }
+  return roomsApi.getAll(category);
 }
 
 export function useRooms() {
@@ -31,7 +27,7 @@ export function useRooms() {
     retry: 1,
   });
 
-  const usingDemo = !isSupabaseConfigured || !!error;
+  const usingDemo = !isSupabaseConfigured;
 
   const filteredRooms = searchQuery.trim()
     ? rooms.filter((r) =>
@@ -47,11 +43,7 @@ export function useRooms() {
       if (!isSupabaseConfigured) {
         return demoRoomsService.create(input, user.id, name);
       }
-      try {
-        return await roomsApi.create(input, user.id, name);
-      } catch {
-        return demoRoomsService.create(input, user.id, name);
-      }
+      return roomsApi.create(input, user.id, name);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
@@ -73,8 +65,8 @@ export function useRooms() {
   return {
     rooms: filteredRooms,
     isLoading,
-    error: usingDemo ? null : error,
-    isDemoMode: !isSupabaseConfigured,
+    error,
+    isDemoMode: usingDemo,
     refetch,
     isFetching,
     selectedCategory,
@@ -92,17 +84,13 @@ export function useRoom(roomId: string) {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
 
-  const { data: room, isLoading } = useQuery({
+  const { data: room, isLoading, isError } = useQuery({
     queryKey: ['room', roomId],
     queryFn: async () => {
-      if (!isSupabaseConfigured || roomId.startsWith('demo-')) {
+      if (!isSupabaseConfigured || isDemoRoomId(roomId)) {
         return demoRoomsService.getById(roomId);
       }
-      try {
-        return await roomsApi.getById(roomId);
-      } catch {
-        return demoRoomsService.getById(roomId);
-      }
+      return roomsApi.getById(roomId);
     },
     staleTime: 30_000,
   });
@@ -110,14 +98,10 @@ export function useRoom(roomId: string) {
   const { data: members = [] } = useQuery({
     queryKey: ['room-members', roomId],
     queryFn: async () => {
-      if (!isSupabaseConfigured || roomId.startsWith('demo-')) {
+      if (!isSupabaseConfigured || isDemoRoomId(roomId)) {
         return demoRoomsService.getMembers(roomId);
       }
-      try {
-        return await roomsApi.getMembers(roomId);
-      } catch {
-        return demoRoomsService.getMembers(roomId);
-      }
+      return roomsApi.getMembers(roomId);
     },
     staleTime: 10_000,
   });
@@ -126,7 +110,7 @@ export function useRoom(roomId: string) {
     mutationFn: async () => {
       if (!user) throw new Error('Not authenticated');
       const name = user.user_metadata?.name ?? 'User';
-      if (!isSupabaseConfigured || roomId.startsWith('demo-')) {
+      if (!isSupabaseConfigured || isDemoRoomId(roomId)) {
         return demoRoomsService.join(roomId, user.id, name);
       }
       await roomsApi.join(roomId, user.id, name);
@@ -140,7 +124,7 @@ export function useRoom(roomId: string) {
   const leaveMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error('Not authenticated');
-      if (!isSupabaseConfigured || roomId.startsWith('demo-')) {
+      if (!isSupabaseConfigured || isDemoRoomId(roomId)) {
         return demoRoomsService.leave(roomId, user.id);
       }
       await roomsApi.leave(roomId, user.id);
@@ -150,16 +134,13 @@ export function useRoom(roomId: string) {
     },
   });
 
-  const isMember =
-    roomId.startsWith('demo-') ||
-    roomId === 'dp-lab' ||
-    roomId === 'graph-clinic' ||
-    members.some((m) => m.userId === user?.id);
+  const isMember = members.some((m) => m.userId === user?.id);
 
   return {
     room,
     members,
     isLoading,
+    isError,
     isMember,
     isAdmin: false,
     join: joinMutation.mutateAsync,

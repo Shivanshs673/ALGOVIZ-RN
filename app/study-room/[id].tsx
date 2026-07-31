@@ -4,7 +4,7 @@
 import React, { useRef, useState } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, StyleSheet, Alert,
+  KeyboardAvoidingView, Platform, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ export default function ChatRoomScreen() {
   const listRef = useRef<FlatList>(null);
   const user = useAuthStore(s => s.user);
 
-  const { room, members, isMember, join, leave } = useRoom(id);
+  const { room, members, isMember, join, leave, isLoading, isError } = useRoom(id);
   const { messages, loading, sending, sendMessage } = useChat(id);
   const { onlineUsers, onlineCount } = usePresence(id);
 
@@ -110,7 +110,28 @@ export default function ChatRoomScreen() {
     );
   }
 
-  if (!room) return null;
+  if (!room) {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <View style={styles.loadingWrap}>
+          {isLoading ? (
+            <>
+              <ActivityIndicator size="large" color="#6C63FF" />
+              <Text style={styles.loadingText}>Loading room...</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="alert-circle-outline" size={48} color="#FF4757" />
+              <Text style={styles.loadingText}>{isError ? 'Could not load this room' : 'Room not found'}</Text>
+              <TouchableOpacity onPress={() => router.back()} style={styles.backLinkBtn}>
+                <Text style={styles.backLinkText}>Go back</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -294,4 +315,8 @@ const styles = StyleSheet.create({
     width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.4 },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
+  loadingText: { color: '#9E9EB8', fontSize: 15 },
+  backLinkBtn: { marginTop: 8, padding: 12 },
+  backLinkText: { color: '#6C63FF', fontWeight: '700' },
 });

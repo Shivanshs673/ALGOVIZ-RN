@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
-import { useEmailAuth } from '../../src/features/auth/hooks/useAuth';
+import { useEmailAuth, useGoogleAuth } from '../../src/features/auth/hooks/useAuth';
+import { getSupabaseConfigError } from '../../src/lib/supabase/client';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
@@ -11,6 +12,8 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
   const { signUpWithEmail, loading, error } = useEmailAuth();
+  const { signInWithGoogle, loading: googleLoading, disabled: googleDisabled, error: googleError } = useGoogleAuth();
+  const configError = getSupabaseConfigError();
 
   function validatePassword(p: string): string | null {
     if (p.length < 8) return 'Password must be at least 8 characters';
@@ -62,7 +65,11 @@ export default function RegisterScreen() {
           <Text style={styles.pageTitle}>Create Account</Text>
           <Text style={styles.pageSubtitle}>Join AlgoViz+ and start learning</Text>
 
-          {error && <View style={styles.errorBanner}><Text style={styles.errorText}>{error}</Text></View>}
+          {(error || googleError || configError) && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorText}>{configError ?? error ?? googleError}</Text>
+            </View>
+          )}
 
           {[
             { label: 'Full Name', value: name, onChange: setName, placeholder: 'John Doe' },
@@ -86,8 +93,26 @@ export default function RegisterScreen() {
             </View>
           ))}
 
-          <TouchableOpacity style={[styles.primaryBtn, loading && styles.btnDisabled]} onPress={handleRegister} disabled={loading}>
+          <TouchableOpacity
+            style={[styles.primaryBtn, (loading || !!configError) && styles.btnDisabled]}
+            onPress={handleRegister}
+            disabled={loading || !!configError}
+          >
             <Text style={styles.primaryBtnText}>{loading ? 'Creating account...' : 'Create Account'}</Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.googleBtn, (googleLoading || googleDisabled || !!configError) && styles.btnDisabled]}
+            onPress={signInWithGoogle}
+            disabled={googleLoading || googleDisabled || !!configError}
+          >
+            <Text style={styles.googleBtnText}>Continue with Google</Text>
           </TouchableOpacity>
 
           <View style={styles.loginRow}>
@@ -119,6 +144,14 @@ const styles = StyleSheet.create({
   primaryBtn: { backgroundColor: '#6C63FF', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 8 },
   btnDisabled: { opacity: 0.5 },
   primaryBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#2A2A4A' },
+  dividerText: { color: '#6B6B8A', fontSize: 13 },
+  googleBtn: {
+    backgroundColor: '#1E1E2E', borderRadius: 14, padding: 16, alignItems: 'center',
+    borderWidth: 1, borderColor: '#2A2A4A',
+  },
+  googleBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
   loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 4 },
   loginText: { color: '#9E9EB8' },
   loginLink: { color: '#6C63FF', fontWeight: '700' },

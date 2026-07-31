@@ -51,12 +51,21 @@ Project: [Google Cloud Console → Credentials](https://console.cloud.google.com
 
 1. **Create OAuth client ID** → **Android**
 2. **Package name:** `com.algoviz.plus`
-3. **SHA-1 certificate fingerprint** (debug keystore):
+3. **SHA-1 certificate fingerprints** — add **both** to the same Android OAuth client:
+
+   **Debug** (local `expo run:android`):
    ```bash
    keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android 2>/dev/null | grep SHA1
    ```
+
+   **EAS / preview APK on your phone** (different keystore):
+   ```bash
+   eas credentials -p android
+   ```
+   Open the build credentials → copy the **SHA-1 fingerprint** and add it in Google Cloud Console.
+
 4. Copy **Client ID** → `.env` as `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`
-5. **Redirect URI** (automatic in this project via `app.config.ts` + `useAuth.ts`):
+5. **Redirect URI** (automatic via `app.config.js` + `useAuth.ts`):
    ```
    com.googleusercontent.apps.128575200416-xxxxxxxx:/oauthredirect
    ```

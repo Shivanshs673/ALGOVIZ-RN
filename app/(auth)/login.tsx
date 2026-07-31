@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingVi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, useRouter } from 'expo-router';
 import { useEmailAuth, useGoogleAuth } from '../../src/features/auth/hooks/useAuth';
+import { getSupabaseConfigError } from '../../src/lib/supabase/client';
 import { useAuthStore } from '../../src/features/auth/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,12 +16,17 @@ export default function LoginScreen() {
 
   const { signInWithEmail, loading, error, clearError } = useEmailAuth();
   const { signInWithGoogle, loading: googleLoading, disabled: googleDisabled, error: googleError } = useGoogleAuth();
+  const configError = getSupabaseConfigError();
 
   useEffect(() => {
     if (session) router.replace('/(tabs)/home');
   }, [session]);
 
   async function handleLogin() {
+    if (configError) {
+      Alert.alert('Configuration error', configError);
+      return;
+    }
     if (!email.trim() || !password) {
       Alert.alert('Missing fields', 'Please enter email and password');
       return;
@@ -46,6 +52,12 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.form}>
+            {configError && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>{configError}</Text>
+              </View>
+            )}
+
             {(error || googleError) && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>{error ?? googleError}</Text>
@@ -91,7 +103,11 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </Link>
 
-            <TouchableOpacity style={[styles.primaryBtn, loading && styles.btnDisabled]} onPress={handleLogin} disabled={loading}>
+            <TouchableOpacity
+              style={[styles.primaryBtn, (loading || !!configError) && styles.btnDisabled]}
+              onPress={handleLogin}
+              disabled={loading || !!configError}
+            >
               <Text style={styles.primaryBtnText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
             </TouchableOpacity>
 
@@ -102,9 +118,9 @@ export default function LoginScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.googleBtn, (googleLoading || googleDisabled) && styles.btnDisabled]}
+              style={[styles.googleBtn, (googleLoading || googleDisabled || !!configError) && styles.btnDisabled]}
               onPress={signInWithGoogle}
-              disabled={googleLoading || googleDisabled}
+              disabled={googleLoading || googleDisabled || !!configError}
             >
               <Text style={styles.googleBtnText}>🔵 Continue with Google</Text>
             </TouchableOpacity>

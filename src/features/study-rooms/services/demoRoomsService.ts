@@ -3,6 +3,7 @@ import { mockMessages, mockMembers, mockRooms } from '../data/mockRooms';
 import { ChatMessage, CreateRoomInput, RoomMember, StudyRoom } from '../../../types/studyroom.types';
 
 const DEMO_ROOMS_KEY = 'algoviz.demo.rooms';
+const DEMO_MEMBERS_KEY = 'algoviz.demo.members';
 const demoMsgKey = (roomId: string) => `algoviz.demo.messages.${roomId}`;
 
 export const DEMO_ROOM_IDS = new Set(mockRooms.map((r) => r.id));
@@ -23,6 +24,20 @@ async function loadStoredRooms(): Promise<StudyRoom[]> {
 
 async function saveRooms(rooms: StudyRoom[]) {
   await AsyncStorage.setItem(DEMO_ROOMS_KEY, JSON.stringify(rooms));
+}
+
+async function loadStoredMembers(): Promise<RoomMember[]> {
+  try {
+    const raw = await AsyncStorage.getItem(DEMO_MEMBERS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore
+  }
+  return [...mockMembers];
+}
+
+async function saveMembers(members: RoomMember[]) {
+  await AsyncStorage.setItem(DEMO_MEMBERS_KEY, JSON.stringify(members));
 }
 
 export const demoRoomsService = {
@@ -65,12 +80,29 @@ export const demoRoomsService = {
   },
 
   getMembers: async (roomId: string): Promise<RoomMember[]> => {
-    return mockMembers.filter((m) => m.roomId === roomId);
+    const members = await loadStoredMembers();
+    return members.filter((m) => m.roomId === roomId);
   },
 
-  join: async (_roomId: string, _userId: string, _userName: string) => undefined,
+  join: async (roomId: string, userId: string, userName: string) => {
+    const members = await loadStoredMembers();
+    if (members.some((m) => m.roomId === roomId && m.userId === userId)) return;
+    members.push({
+      roomId,
+      userId,
+      userName,
+      joinedAt: Date.now(),
+      isOnline: true,
+      unreadCount: 0,
+      isTyping: false,
+    });
+    await saveMembers(members);
+  },
 
-  leave: async (_roomId: string, _userId: string) => undefined,
+  leave: async (roomId: string, userId: string) => {
+    const members = await loadStoredMembers();
+    await saveMembers(members.filter((m) => !(m.roomId === roomId && m.userId === userId)));
+  },
 
   getMessages: async (roomId: string): Promise<ChatMessage[]> => {
     try {

@@ -58,6 +58,12 @@
       "expo-web-browser",
       "expo-updates",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "AlgoViz+ needs photo library access so you can choose a profile picture."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

@@ -53,9 +53,15 @@ if (!isConfigured && __DEV__) {
 
 export const isSupabaseConfigured = isConfigured;
 
+/** Shown on login when the installed build was compiled without EAS env vars. */
+export function getSupabaseConfigError(): string | null {
+  if (isConfigured) return null;
+  return 'This build is missing Supabase credentials. Rebuild the app on EAS after adding preview/production environment variables.';
+}
+
 export const supabase = createClient(
-  isConfigured ? supabaseUrl : 'https://zosawqjebxkjppwtkegx.supabase.co',
-  isConfigured ? supabaseAnonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder',
+  supabaseUrl || 'https://placeholder.invalid',
+  supabaseAnonKey || 'missing-anon-key',
   {
     auth: {
       storage: ExpoSecureStoreAdapter,
