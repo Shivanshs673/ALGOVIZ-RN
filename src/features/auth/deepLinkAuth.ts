@@ -20,11 +20,15 @@ function parseAuthParams(url: string): Record<string, string> {
   return params;
 }
 
+export function isOAuthCallbackUrl(url: string): boolean {
+  return url.includes('auth/callback');
+}
+
 export function isAuthRecoveryUrl(url: string): boolean {
+  if (isOAuthCallbackUrl(url)) return false;
   return (
     url.includes('password-reset') ||
-    url.includes('type=recovery') ||
-    url.includes('access_token=')
+    url.includes('type=recovery')
   );
 }
 

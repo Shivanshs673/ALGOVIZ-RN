@@ -3,14 +3,32 @@ import { useState } from 'react';
 import { roomsApi } from '../api/roomsApi';
 import { demoRoomsService, isDemoRoomId } from '../services/demoRoomsService';
 import { useAuthStore } from '../../auth/store/authStore';
-import { CreateRoomInput } from '../../../types/studyroom.types';
+import { CreateRoomInput, StudyRoom } from '../../../types/studyroom.types';
 import { isSupabaseConfigured } from '../../../lib/supabase/client';
 
-async function fetchRooms(category: string) {
+type RoomsSource = 'demo' | 'live' | 'fallback';
+
+async function fetchRooms(category: string): Promise<{ rooms: StudyRoom[]; source: RoomsSource }> {
   if (!isSupabaseConfigured) {
-    return demoRoomsService.getAll(category);
+    return { rooms: await demoRoomsService.getAll(category), source: 'demo' };
   }
-  return roomsApi.getAll(category);
+  try {
+    const rooms = await roomsApi.getAll(category);
+    return { rooms, source: 'live' };
+  } catch {
+    return { rooms: await demoRoomsService.getAll(category), source: 'fallback' };
+  }
+}
+
+async function fetchRoomById(roomId: string): Promise<StudyRoom> {
+  if (!isSupabaseConfigured || isDemoRoomId(roomId)) {
+    return demoRoomsService.getById(roomId);
+  }
+  try {
+    return await roomsApi.getById(roomId);
+  } catch {
+    return demoRoomsService.getById(roomId);
+  }
 }
 
 export function useRooms() {
@@ -19,7 +37,7 @@ export function useRooms() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
 
-  const { data: rooms = [], isLoading, error, refetch, isFetching } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['rooms', selectedCategory],
     queryFn: () => fetchRooms(selectedCategory),
     staleTime: 30_000,
@@ -27,7 +45,9 @@ export function useRooms() {
     retry: 1,
   });
 
-  const usingDemo = !isSupabaseConfigured;
+  const rooms = data?.rooms ?? [];
+  const roomsSource = data?.source ?? (isSupabaseConfigured ? 'live' : 'demo');
+  const usingDemo = roomsSource !== 'live';
 
   const filteredRooms = searchQuery.trim()
     ? rooms.filter((r) =>
@@ -43,7 +63,14 @@ export function useRooms() {
       if (!isSupabaseConfigured) {
         return demoRoomsService.create(input, user.id, name);
       }
-      return roomsApi.create(input, user.id, name);
+      try {
+        return await roomsApi.create(input, user.id, name);
+      } catch (err) {
+        if (__DEV__) {
+          console.warn('[StudyRooms] Supabase create failed, using demo room', err);
+        }
+        return demoRoomsService.create(input, user.id, name);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
@@ -65,8 +92,9 @@ export function useRooms() {
   return {
     rooms: filteredRooms,
     isLoading,
-    error,
+    error: usingDemo ? null : error,
     isDemoMode: usingDemo,
+    roomsSource,
     refetch,
     isFetching,
     selectedCategory,
@@ -83,26 +111,30 @@ export function useRooms() {
 export function useRoom(roomId: string) {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const normalizedId = roomId?.trim() ?? '';
+  const demo = !normalizedId || isDemoRoomId(normalizedId) || !isSupabaseConfigured;
 
   const { data: room, isLoading, isError } = useQuery({
-    queryKey: ['room', roomId],
-    queryFn: async () => {
-      if (!isSupabaseConfigured || isDemoRoomId(roomId)) {
-        return demoRoomsService.getById(roomId);
-      }
-      return roomsApi.getById(roomId);
-    },
+    queryKey: ['room', normalizedId],
+    queryFn: () => fetchRoomById(normalizedId),
+    enabled: Boolean(normalizedId),
     staleTime: 30_000,
+    retry: demo ? 0 : 1,
   });
 
   const { data: members = [] } = useQuery({
-    queryKey: ['room-members', roomId],
+    queryKey: ['room-members', normalizedId],
     queryFn: async () => {
-      if (!isSupabaseConfigured || isDemoRoomId(roomId)) {
-        return demoRoomsService.getMembers(roomId);
+      if (demo) {
+        return demoRoomsService.getMembers(normalizedId);
       }
-      return roomsApi.getMembers(roomId);
+      try {
+        return await roomsApi.getMembers(normalizedId);
+      } catch {
+        return demoRoomsService.getMembers(normalizedId);
+      }
     },
+    enabled: Boolean(normalizedId),
     staleTime: 10_000,
   });
 
@@ -110,27 +142,35 @@ export function useRoom(roomId: string) {
     mutationFn: async () => {
       if (!user) throw new Error('Not authenticated');
       const name = user.user_metadata?.name ?? 'User';
-      if (!isSupabaseConfigured || isDemoRoomId(roomId)) {
-        return demoRoomsService.join(roomId, user.id, name);
+      if (demo) {
+        return demoRoomsService.join(normalizedId, user.id, name);
       }
-      await roomsApi.join(roomId, user.id, name);
+      try {
+        await roomsApi.join(normalizedId, user.id, name);
+      } catch {
+        await demoRoomsService.join(normalizedId, user.id, name);
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['room-members', roomId] });
-      queryClient.invalidateQueries({ queryKey: ['room', roomId] });
+      queryClient.invalidateQueries({ queryKey: ['room-members', normalizedId] });
+      queryClient.invalidateQueries({ queryKey: ['room', normalizedId] });
     },
   });
 
   const leaveMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error('Not authenticated');
-      if (!isSupabaseConfigured || isDemoRoomId(roomId)) {
-        return demoRoomsService.leave(roomId, user.id);
+      if (demo) {
+        return demoRoomsService.leave(normalizedId, user.id);
       }
-      await roomsApi.leave(roomId, user.id);
+      try {
+        await roomsApi.leave(normalizedId, user.id);
+      } catch {
+        await demoRoomsService.leave(normalizedId, user.id);
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['room-members', roomId] });
+      queryClient.invalidateQueries({ queryKey: ['room-members', normalizedId] });
     },
   });
 
@@ -139,7 +179,7 @@ export function useRoom(roomId: string) {
   return {
     room,
     members,
-    isLoading,
+    isLoading: isLoading && Boolean(normalizedId),
     isError,
     isMember,
     isAdmin: false,

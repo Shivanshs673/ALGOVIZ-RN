@@ -1,44 +1,41 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../../../lib/supabase/client';
 import { messagesApi } from '../api/messagesApi';
-import { demoRoomsService } from '../services/demoRoomsService';
+import { demoRoomsService, isDemoRoomId } from '../services/demoRoomsService';
 import { ChatMessage } from '../../../types/studyroom.types';
 import { useAuthStore } from '../../auth/store/authStore';
-
-function isDemoRoom(roomId: string) {
-  return !isSupabaseConfigured || roomId.startsWith('demo-') || roomId === 'dp-lab' || roomId === 'graph-clinic';
-}
 
 export function useChat(roomId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const user = useAuthStore((s) => s.user);
-  const demo = isDemoRoom(roomId);
+  const normalizedId = roomId?.trim() ?? '';
+  const demo = !normalizedId || !isSupabaseConfigured || isDemoRoomId(normalizedId);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const loader = demo ? demoRoomsService.getMessages(roomId) : messagesApi.getMessages(roomId);
+    const loader = demo ? demoRoomsService.getMessages(normalizedId) : messagesApi.getMessages(normalizedId);
     loader
       .then((msgs) => { if (!cancelled) setMessages(msgs); })
       .catch(() => { if (!cancelled) setMessages([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [roomId, demo]);
+  }, [normalizedId, demo]);
 
   useEffect(() => {
-    if (demo) return;
+    if (demo || !normalizedId) return;
 
     const channel = supabase
-      .channel(`chat:${roomId}`)
+      .channel(`chat:${normalizedId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'study_room_messages',
-          filter: `room_id=eq.${roomId}`,
+          filter: `room_id=eq.${normalizedId}`,
         },
         (payload) => {
           const row = payload.new as Record<string, unknown>;
@@ -66,7 +63,7 @@ export function useChat(roomId: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomId, demo]);
+  }, [normalizedId, demo]);
 
   const sendMessage = useCallback(
     async (content: string, replyToId?: string, replyToContent?: string) => {
@@ -78,7 +75,7 @@ export function useChat(roomId: string) {
       const userName = user.user_metadata?.name ?? user.email?.split('@')[0] ?? 'User';
       const tempMsg: ChatMessage = {
         id: tempId,
-        roomId,
+        roomId: normalizedId,
         userId: user.id,
         userName,
         content: content.trim(),
@@ -94,12 +91,12 @@ export function useChat(roomId: string) {
       try {
         if (demo) {
           const sent = await demoRoomsService.send(
-            roomId, content, user.id, userName, replyToId, replyToContent,
+            normalizedId, content, user.id, userName, replyToId, replyToContent,
           );
           setMessages((prev) => prev.map((m) => (m.id === tempId ? sent : m)));
         } else {
           const sent = await messagesApi.send(
-            { roomId, content, type: 'TEXT', replyToId, replyToContent },
+            { roomId: normalizedId, content, type: 'TEXT', replyToId, replyToContent },
             user.id,
             userName,
           );
@@ -112,7 +109,7 @@ export function useChat(roomId: string) {
         setSending(false);
       }
     },
-    [roomId, user, demo],
+    [normalizedId, user, demo],
   );
 
   const deleteMessage = useCallback(async (messageId: string) => {

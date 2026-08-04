@@ -1,28 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { supabase } from '../../../lib/supabase/client';
-import { getGoogleRedirectUri } from '../googleOAuth';
+import { supabase, getSupabaseConfigError, isSupabaseConfigured } from '../../../lib/supabase/client';
+import { getAuthRedirectUri } from '../googleOAuth';
+import { createSessionFromUrl } from '../deepLinkAuth';
 
 WebBrowser.maybeCompleteAuthSession();
-
-const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
-const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
-const ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
-
-function getGoogleConfigError(): string | null {
-  if (!WEB_CLIENT_ID || WEB_CLIENT_ID.includes('your-google')) {
-    return 'Set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in .env';
-  }
-  if (Platform.OS === 'ios' && !IOS_CLIENT_ID) {
-    return 'Missing EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID — create an iOS OAuth client in Google Cloud Console (bundle: com.algoviz.plus).';
-  }
-  if (Platform.OS === 'android' && !ANDROID_CLIENT_ID) {
-    return 'Missing EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID — create an Android OAuth client (package: com.algoviz.plus + SHA-1).';
-  }
-  return null;
-}
 
 export function useEmailAuth() {
   const [loading, setLoading] = useState(false);
@@ -82,57 +65,64 @@ export function useGoogleAuth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const configError = useMemo(() => getGoogleConfigError(), []);
-
-  const redirectUri = useMemo(
-    () => getGoogleRedirectUri(ANDROID_CLIENT_ID, IOS_CLIENT_ID),
-    [],
-  );
-
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    webClientId: WEB_CLIENT_ID,
-    iosClientId: IOS_CLIENT_ID || undefined,
-    androidClientId: ANDROID_CLIENT_ID || undefined,
-    redirectUri,
-  });
-
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const idToken = response.params.id_token;
-      if (!idToken) {
-        setError('Google did not return an ID token. Check OAuth client IDs in Google Cloud + Supabase.');
-        return;
-      }
-      setLoading(true);
-      supabase.auth
-        .signInWithIdToken({ provider: 'google', token: idToken })
-        .then(({ error: signInError }) => {
-          if (signInError) {
-            setError(signInError.message);
-          }
-        })
-        .finally(() => setLoading(false));
-    } else if (response?.type === 'error') {
-      const msg = response.error?.message ?? response.params?.error_description ?? 'Google sign in failed';
-      setError(msg);
-    }
-  }, [response]);
+  const configError = getSupabaseConfigError();
+  const redirectUri = getAuthRedirectUri();
 
   async function signInWithGoogle() {
-    const cfgErr = getGoogleConfigError();
+    const cfgErr = getSupabaseConfigError();
     if (cfgErr) {
       setError(cfgErr);
       return;
     }
+
+    setLoading(true);
     setError(null);
-    await promptAsync();
+
+    try {
+      if (Platform.OS === 'web') {
+        const { error: oauthError } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: redirectUri },
+        });
+        if (oauthError) throw oauthError;
+        return;
+      }
+
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUri,
+          skipBrowserRedirect: true,
+        },
+      });
+      if (oauthError) throw oauthError;
+      if (!data?.url) throw new Error('Supabase did not return a Google sign-in URL.');
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+      if (result.type === 'cancel' || result.type === 'dismiss') return;
+      if (result.type !== 'success') {
+        throw new Error('Google sign in was not completed.');
+      }
+
+      const session = await createSessionFromUrl(result.url);
+      if (!session) {
+        throw new Error(
+          'Sign in completed but no session was returned. Add algovizplus://auth/callback to Supabase Auth → Redirect URLs.',
+        );
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Google sign in failed';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return {
     signInWithGoogle,
     loading,
     error: configError ?? error,
-    disabled: !request || !!configError,
+    disabled: !isSupabaseConfigured || !!configError,
     redirectUri,
   };
 }

@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../../../lib/supabase/client';
+import { supabase, isSupabaseConfigured } from '../../../lib/supabase/client';
 import { PresenceEntry } from '../../../types/studyroom.types';
 import { useAuthStore } from '../../auth/store/authStore';
+import { isDemoRoomId } from '../services/demoRoomsService';
 
 export function usePresence(roomId: string) {
   const [onlineUsers, setOnlineUsers] = useState<PresenceEntry[]>([]);
   const user = useAuthStore(s => s.user);
+  const normalizedId = roomId?.trim() ?? '';
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !normalizedId || !isSupabaseConfigured || isDemoRoomId(normalizedId)) return;
 
-    const channel = supabase.channel(`presence:${roomId}`, {
+    const channel = supabase.channel(`presence:${normalizedId}`, {
       config: { presence: { key: user.id } },
     });
 
@@ -42,7 +44,7 @@ export function usePresence(roomId: string) {
           await supabase
             .from('study_room_members')
             .update({ is_online: true, last_seen_at: Date.now() })
-            .eq('room_id', roomId)
+            .eq('room_id', normalizedId)
             .eq('user_id', user.id);
         }
       });
@@ -53,10 +55,10 @@ export function usePresence(roomId: string) {
       supabase
         .from('study_room_members')
         .update({ is_online: false, last_seen_at: Date.now() })
-        .eq('room_id', roomId)
+        .eq('room_id', normalizedId)
         .eq('user_id', user.id);
     };
-  }, [roomId, user?.id]);
+  }, [normalizedId, user?.id]);
 
   return { onlineUsers, onlineCount: onlineUsers.length };
 }

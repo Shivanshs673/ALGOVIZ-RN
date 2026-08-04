@@ -115,7 +115,9 @@ export default function StudyRoomsScreen() {
       {isDemoMode && (
         <View style={styles.demoBanner}>
           <Ionicons name="information-circle-outline" size={18} color="#FFB347" />
-          <Text style={styles.demoText}>Demo rooms — connect Supabase SQL for live rooms</Text>
+          <Text style={styles.demoText}>
+            Demo rooms — run study room SQL in Supabase for live rooms (see docs/08_SUPABASE_SETUP.md)
+          </Text>
         </View>
       )}
 

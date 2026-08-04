@@ -14,6 +14,31 @@
 | **Using Expo Go** | OAuth needs a **development build** (`npx expo run:ios` / `run:android`) |
 | **Client IDs not in Supabase** | Add Web + iOS + Android IDs in Supabase → Auth → Google |
 | **OAuth consent screen in Testing** | Add your Gmail as a test user in Google Cloud |
+| **Web browser: `redirect_uri_mismatch`** | Add `http://localhost:8081/oauthredirect` to **Web** OAuth client (see below) |
+
+---
+
+## Web browser (`npm run web`) — `redirect_uri_mismatch`
+
+If you test in **Chrome/Brave** and see **`Error 400: redirect_uri_mismatch`**, the app is using the **Web OAuth client** with an `http://localhost:...` redirect — **not** the Android/iOS scheme.
+
+In Google Cloud → **Web application** OAuth client:
+
+**Authorized JavaScript origins:**
+```
+http://localhost:8081
+http://localhost:19006
+```
+
+**Authorized redirect URIs** (add both; use the one your app prints in Metro if different):
+```
+http://localhost:8081/oauthredirect
+http://localhost:19006/oauthredirect
+```
+
+Then restart the app and try Google Sign-In again.
+
+> Mobile APK and web use **different** redirect URIs. Fixing Android SHA-1 does **not** fix web login.
 
 ---
 

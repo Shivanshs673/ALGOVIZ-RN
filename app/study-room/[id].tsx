@@ -18,16 +18,17 @@ import { ChatMessage } from '../../src/types/studyroom.types';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function ChatRoomScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
+  const roomId = Array.isArray(rawId) ? rawId[0] : rawId ?? '';
   const router = useRouter();
   const [input, setInput] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const listRef = useRef<FlatList>(null);
   const user = useAuthStore(s => s.user);
 
-  const { room, members, isMember, join, leave, isLoading, isError } = useRoom(id);
-  const { messages, loading, sending, sendMessage } = useChat(id);
-  const { onlineUsers, onlineCount } = usePresence(id);
+  const { room, members, isMember, join, leave, isLoading, isError } = useRoom(roomId);
+  const { messages, loading, sending, sendMessage } = useChat(roomId);
+  const { onlineUsers, onlineCount } = usePresence(roomId);
 
   async function handleSend() {
     if (!input.trim() || !isMember) return;

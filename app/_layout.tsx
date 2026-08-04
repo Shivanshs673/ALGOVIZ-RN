@@ -11,7 +11,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '../src/lib/supabase/client';
 import { useAuthStore } from '../src/features/auth/store/authStore';
 import { useGlobalPresence } from '../src/features/presence/useGlobalPresence';
-import { createSessionFromUrl, getInitialAuthUrl, isAuthRecoveryUrl } from '../src/features/auth/deepLinkAuth';
+import {
+  createSessionFromUrl,
+  getInitialAuthUrl,
+  isAuthRecoveryUrl,
+  isOAuthCallbackUrl,
+} from '../src/features/auth/deepLinkAuth';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -38,6 +43,16 @@ export default function RootLayout() {
 
   useEffect(() => {
     async function handleAuthUrl(url: string) {
+      if (isOAuthCallbackUrl(url)) {
+        try {
+          const oauthSession = await createSessionFromUrl(url);
+          if (oauthSession) setSession(oauthSession);
+        } catch {
+          // OAuth deep link failed — user can retry from login
+        }
+        return;
+      }
+
       if (!isAuthRecoveryUrl(url)) return;
       try {
         const recoverySession = await createSessionFromUrl(url);
