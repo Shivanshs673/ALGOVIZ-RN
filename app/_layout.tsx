@@ -66,14 +66,26 @@ export default function RootLayout() {
     }
 
     // Load persisted session on startup
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      SplashScreen.hideAsync().catch(() => undefined);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+      })
+      .catch(() => {
+        // Never block app startup if secure storage/session restoration fails.
+        setSession(null);
+      })
+      .finally(() => {
+        SplashScreen.hideAsync().catch(() => undefined);
+      });
 
-    getInitialAuthUrl().then((url) => {
-      if (url) handleAuthUrl(url);
-    });
+    getInitialAuthUrl()
+      .then((url) => {
+        if (url) return handleAuthUrl(url);
+      })
+      .catch(() => {
+        // Ignore malformed startup deep links.
+      });
 
     const linkSub = Linking.addEventListener('url', ({ url }) => {
       handleAuthUrl(url);

@@ -47,7 +47,7 @@
     "web": "expo start --web",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "doctor": "npx expo-doctor",
+    "doctor": "npx expo install --check",
     "export:web": "expo export --platform web --output-dir dist-web",
     "ci": "npm run typecheck && npm run doctor"
   },
